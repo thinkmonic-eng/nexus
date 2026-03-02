@@ -353,6 +353,50 @@ function RedoIcon() {
   );
 }
 
+// Cycle detection using DFS
+function detectCycle(tasks: Task[], fromTaskId: string, toTaskId: string): boolean {
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  function hasCycle(taskId: string): boolean {
+    visited.add(taskId);
+    recursionStack.add(taskId);
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && task.dependencies) {
+      for (const depId of task.dependencies) {
+        if (!visited.has(depId)) {
+          if (hasCycle(depId)) return true;
+        } else if (recursionStack.has(depId)) {
+          return true;
+        }
+      }
+    }
+
+    recursionStack.delete(taskId);
+    return false;
+  }
+
+  // Temporarily add the dependency to check for cycle
+  const tempTasks = tasks.map((t) =>
+    t.id === fromTaskId
+      ? { ...t, dependencies: [...(t.dependencies || []), toTaskId] }
+      : t
+  );
+
+  return hasCycle(fromTaskId);
+}
+
+// Check if a task is blocked (has uncompleted dependencies)
+function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
+  if (!task.dependencies || task.dependencies.length === 0) return false;
+  
+  return task.dependencies.some((depId) => {
+    const depTask = allTasks.find((t) => t.id === depId);
+    return depTask && depTask.status !== "done";
+  });
+}
+
 // SlideOver Component for Editing Tasks
 function SlideOver({
   isOpen,
@@ -360,12 +404,14 @@ function SlideOver({
   task,
   onSave,
   onDelete,
+  allTasks,
 }: {
   isOpen: boolean;
   onClose: () => void;
   task: Task | null;
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  allTasks: Task[];
 }) {
   const [formData, setFormData] = useState<Partial<Task>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -375,6 +421,7 @@ function SlideOver({
     contract: false,
     execution: false,
     activity: false,
+    dependencies: false,
   });
 
   useEffect(() => {
@@ -592,6 +639,106 @@ function SlideOver({
                     <p>• Task created on {task.createdAt.toLocaleDateString()}</p>
                     <p>• Last updated: {new Date().toLocaleDateString()}</p>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Dependencies */}
+            <div className="border border-[var(--border-default)] rounded-lg">
+              <button
+                onClick={() => toggleSection("dependencies")}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-primary)]/50 transition-colors"
+              >
+                <span className="font-medium flex items-center gap-2">
+                  Dependencies
+                  {(formData.dependencies?.length || 0) > 0 && (
+                    <Badge variant="default">{formData.dependencies?.length}</Badge>
+                  )}
+                </span>
+                <ChevronDownIcon className={expandedSections.dependencies ? "rotate-180" : ""} />
+              </button>
+              {expandedSections.dependencies && (
+                <div className="px-4 pb-4 space-y-3">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Select tasks that must be completed before this task can start.
+                  </p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {allTasks
+                      .filter((t) => t.id !== task.id)
+                      .map((t) => {
+                        const isSelected = formData.dependencies?.includes(t.id);
+                        const wouldCreateCycle = isSelected && detectCycle(allTasks, task.id, t.id);
+                        return (
+                          <label
+                            key={t.id}
+                            className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
+                              isSelected
+                                ? wouldCreateCycle
+                                  ? "border-red-500 bg-red-500/10"
+                                  : "border-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
+                                : "border-[var(--border-default)] hover:bg-[var(--bg-primary)]/50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const currentDeps = formData.dependencies || [];
+                                if (e.target.checked) {
+                                  // Check for cycle before adding
+                                  if (detectCycle(allTasks, task.id, t.id)) {
+                                    alert(`Cannot add "${t.title}" as a dependency - it would create a circular dependency!`);
+                                    return;
+                                  }
+                                  handleChange("dependencies", [...currentDeps, t.id]);
+                                } else {
+                                  handleChange(
+                                    "dependencies",
+                                    currentDeps.filter((id) => id !== t.id)
+                                  );
+                                }
+                              }}
+                              className="rounded border-[var(--border-default)]"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{t.title}</p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {t.status === "done" ? "✅ Completed" : t.status === "inprogress" ? "🔄 In Progress" : "⏳ To Do"}
+                              </p>
+                            </div>
+                            {wouldCreateCycle && (
+                              <span className="text-xs text-red-500">⚠️ Cycle</span>
+                            )}
+                          </label>
+                        );
+                      })}
+                  </div>
+                  {formData.dependencies && formData.dependencies.length > 0 && (
+                    <div className="pt-2 border-t border-[var(--border-default)]">
+                      <p className="text-sm font-medium mb-2">Selected dependencies:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.dependencies.map((depId) => {
+                          const depTask = allTasks.find((t) => t.id === depId);
+                          return depTask ? (
+                            <Badge key={depId} variant="secondary" className="flex items-center gap-1">
+                              {depTask.title}
+                              <button
+                                onClick={() => {
+                                  handleChange(
+                                    "dependencies",
+                                    formData.dependencies?.filter((id) => id !== depId) || []
+                                  );
+                                }}
+                                className="ml-1 hover:text-red-500"
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -835,12 +982,20 @@ export default function TaskManager() {
 
   const TaskCard = ({ task }: { task: Task }) => {
     const priorityStyle = PRIORITIES[task.priority];
+    const blocked = isTaskBlocked(task, tasks);
+    const depCount = task.dependencies?.length || 0;
+    const completedDeps = task.dependencies?.filter((depId) => {
+      const depTask = tasks.find((t) => t.id === depId);
+      return depTask?.status === "done";
+    }).length || 0;
 
     return (
       <Card
         draggable
         onDragStart={() => handleDragStart(task.id)}
-        className="cursor-move hover:shadow-lg transition-all duration-200 border-l-4"
+        className={`cursor-move hover:shadow-lg transition-all duration-200 border-l-4 ${
+          blocked ? "opacity-75" : ""
+        }`}
         style={{
           borderLeftColor:
             task.priority === "high"
@@ -857,13 +1012,30 @@ export default function TaskManager() {
                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${priorityStyle.color}`}>
                   {priorityStyle.label}
                 </span>
+                {blocked && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500 border border-red-500/30" title="Blocked by incomplete dependencies">
+                    🔒 Blocked
+                  </span>
+                )}
+                {depCount > 0 && !blocked && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500 border border-green-500/30" title="All dependencies completed">
+                    ✅ {completedDeps}/{depCount} deps
+                  </span>
+                )}
               </div>
               <h4 className="font-semibold text-sm mb-1 truncate">
                 {task.title}
-              </h4>
-              <p className="text-xs text-[var(--text-muted)] line-clamp-2 mb-3">
+              </h4>              <p className="text-xs text-[var(--text-muted)] line-clamp-2 mb-3">
                 {task.description}
               </p>
+              {depCount > 0 && (
+                <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-2">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span>{completedDeps}/{depCount} dependencies</span>
+                </div>
+              )}
               <div className="flex flex-wrap gap-1 mb-3">
                 {task.tags.map((tag) => (
                   <span
@@ -1084,6 +1256,7 @@ export default function TaskManager() {
           task={editingTask}
           onSave={handleUpdateTask}
           onDelete={handleDeleteTask}
+          allTasks={tasks}
         />
 
         {/* Kanban Board */}

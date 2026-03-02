@@ -397,6 +397,23 @@ function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
   });
 }
 
+// Undo/Redo Icons - Issue #9
+function UndoIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+    </svg>
+  );
+}
+
 // SlideOver Component for Editing Tasks
 function SlideOver({
   isOpen,
@@ -825,12 +842,55 @@ export default function TaskManager() {
       createdAt: new Date(),
     };
 
+    // Add to action history for undo - Issue #9
+    const action: Action = {
+      id: `action-${Date.now()}`,
+      type: "create",
+      task: newTask,
+      timestamp: new Date(),
+    };
+
+    const newHistory = actionHistory.slice(0, historyIndex + 1);
+    newHistory.push(action);
+    
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
+    }
+    
+    setActionHistory(newHistory);
     setTasks([...tasks, newTask]);
     resetForm();
     setIsCreateOpen(false);
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
+    const previousTask = tasks.find((t) => t.id === updatedTask.id);
+    if (!previousTask) return;
+
+    // Add to action history for undo - Issue #9
+    const action: Action = {
+      id: `action-${Date.now()}`,
+      type: "update",
+      task: updatedTask,
+      previousTask: previousTask,
+      timestamp: new Date(),
+    };
+
+    const newHistory = actionHistory.slice(0, historyIndex + 1);
+    newHistory.push(action);
+    
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
+    }
+    
+    setActionHistory(newHistory);
+
     setTasks(
       tasks.map((task) =>
         task.id === updatedTask.id ? updatedTask : task
@@ -853,17 +913,17 @@ export default function TaskManager() {
       timestamp: new Date(),
     };
 
-    // Truncate any redo history and add new action
     const newHistory = actionHistory.slice(0, historyIndex + 1);
     newHistory.push(action);
     
-    // Keep only MAX_HISTORY actions
     if (newHistory.length > MAX_HISTORY) {
       newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
     }
     
     setActionHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
     
     setTasks(tasks.filter((task) => task.id !== taskId));
   };

@@ -335,7 +335,6 @@ function ChevronDownIcon({ className = "" }: { className?: string }) {
     </svg>
   );
 }
-
 // Undo/Redo Icons - Issue #9
 function UndoIcon() {
   return (
@@ -353,7 +352,8 @@ function RedoIcon() {
   );
 }
 
-// Cycle detection using DFS
+// Cycle detection using DFS - Issue #10
+
 function detectCycle(tasks: Task[], fromTaskId: string, toTaskId: string): boolean {
   const visited = new Set<string>();
   const recursionStack = new Set<string>();

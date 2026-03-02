@@ -678,12 +678,55 @@ export default function TaskManager() {
       createdAt: new Date(),
     };
 
+    // Add to action history for undo - Issue #9
+    const action: Action = {
+      id: `action-${Date.now()}`,
+      type: "create",
+      task: newTask,
+      timestamp: new Date(),
+    };
+
+    const newHistory = actionHistory.slice(0, historyIndex + 1);
+    newHistory.push(action);
+    
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
+    }
+    
+    setActionHistory(newHistory);
     setTasks([...tasks, newTask]);
     resetForm();
     setIsCreateOpen(false);
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
+    const previousTask = tasks.find((t) => t.id === updatedTask.id);
+    if (!previousTask) return;
+
+    // Add to action history for undo - Issue #9
+    const action: Action = {
+      id: `action-${Date.now()}`,
+      type: "update",
+      task: updatedTask,
+      previousTask: previousTask,
+      timestamp: new Date(),
+    };
+
+    const newHistory = actionHistory.slice(0, historyIndex + 1);
+    newHistory.push(action);
+    
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
+    }
+    
+    setActionHistory(newHistory);
+
     setTasks(
       tasks.map((task) =>
         task.id === updatedTask.id ? updatedTask : task
@@ -706,17 +749,17 @@ export default function TaskManager() {
       timestamp: new Date(),
     };
 
-    // Truncate any redo history and add new action
     const newHistory = actionHistory.slice(0, historyIndex + 1);
     newHistory.push(action);
     
-    // Keep only MAX_HISTORY actions
     if (newHistory.length > MAX_HISTORY) {
       newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
     }
     
     setActionHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
     
     setTasks(tasks.filter((task) => task.id !== taskId));
   };

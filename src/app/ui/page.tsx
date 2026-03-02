@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { ApiDashboardStats, ApiHealthCheck, TaskSyncButton } from "@/components/api-dashboard";
+import { WebhookManager } from "@/components/webhook-manager";
+import { triggerWebhooksForEvent } from "@/lib/webhooks";
 
 // Types
 interface Task {
@@ -847,6 +849,10 @@ export default function TaskManager() {
     
     setActionHistory(newHistory);
     setTasks([...tasks, newTask]);
+    
+    // Trigger webhooks - Issue #15
+    triggerWebhooksForEvent("task.created", newTask);
+    
     resetForm();
     setIsCreateOpen(false);
   };
@@ -881,6 +887,14 @@ export default function TaskManager() {
         task.id === updatedTask.id ? updatedTask : task
       )
     );
+    
+    // Trigger webhooks - Issue #15
+    const statusChanged = previousTask.status !== updatedTask.status;
+    if (statusChanged) {
+      triggerWebhooksForEvent("task.status_changed", updatedTask);
+    }
+    triggerWebhooksForEvent("task.updated", updatedTask);
+    
     setEditingTask(null);
     setIsEditOpen(false);
     resetForm();
@@ -911,6 +925,9 @@ export default function TaskManager() {
     setActionHistory(newHistory);
     
     setTasks(tasks.filter((task) => task.id !== taskId));
+    
+    // Trigger webhooks - Issue #15
+    triggerWebhooksForEvent("task.deleted", taskToDelete);
   };
 
   // Undo function - Issue #9
@@ -1238,6 +1255,11 @@ export default function TaskManager() {
         <div className="flex flex-wrap items-center gap-4 mb-6">
           <ApiHealthCheck />
           <TaskSyncButton />
+        </div>
+
+        {/* Webhook Manager - Issue #15 */}
+        <div className="mb-6">
+          <WebhookManager />
         </div>
 
         {/* Toolbar */}

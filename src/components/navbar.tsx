@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, Sparkles } from "lucide-react";
+import ProjectSelector from "./project-selector";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,7 +54,10 @@ export default function Navbar() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            {isAuthenticated ? (
+            <div className="hidden md:flex items-center gap-4">
+              <ProjectSelector />
+            </div>
+          {isAuthenticated ? (
               <Link href="/login">
                 <Button variant="outline" size="sm">
                   Mi Cuenta

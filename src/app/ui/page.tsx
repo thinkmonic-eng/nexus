@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ApiDashboardStats, ApiHealthCheck, TaskSyncButton } from "@/components/api-dashboard";
+import { DataExport } from "@/components/data-export";
 
 // Types
 interface Task {
@@ -1238,6 +1239,11 @@ export default function TaskManager() {
         <div className="flex flex-wrap items-center gap-4 mb-6">
           <ApiHealthCheck />
           <TaskSyncButton />
+        </div>
+
+        {/* Data Export - Issue #16 */}
+        <div className="mb-6">
+          <DataExport />
         </div>
 
         {/* Toolbar */}

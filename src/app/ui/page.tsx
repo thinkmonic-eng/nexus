@@ -27,6 +27,15 @@ interface Activity {
   user: string;
 }
 
+// Action History for Undo/Redo - Issue #9
+interface Action {
+  id: string;
+  type: "create" | "update" | "delete";
+  task: Task;
+  previousTask?: Task;
+  timestamp: Date;
+}
+
 interface Column {
   id: string;
   title: string;
@@ -327,6 +336,23 @@ function ChevronDownIcon({ className = "" }: { className?: string }) {
   );
 }
 
+// Undo/Redo Icons - Issue #9
+function UndoIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+    </svg>
+  );
+}
+
 // SlideOver Component for Editing Tasks
 function SlideOver({
   isOpen,
@@ -616,6 +642,11 @@ export default function TaskManager() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [filterTag, setFilterTag] = useState<string>("");
+  
+  // Action History for Undo/Redo - Issue #9
+  const [actionHistory, setActionHistory] = useState<Action[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const MAX_HISTORY = 50;
 
   // Form state
   const [formData, setFormData] = useState<Partial<Task>>({
@@ -664,8 +695,99 @@ export default function TaskManager() {
   };
 
   const handleDeleteTask = (taskId: string) => {
+    const taskToDelete = tasks.find((t) => t.id === taskId);
+    if (!taskToDelete) return;
+
+    // Add to action history for undo - Issue #9
+    const action: Action = {
+      id: `action-${Date.now()}`,
+      type: "delete",
+      task: taskToDelete,
+      timestamp: new Date(),
+    };
+
+    // Truncate any redo history and add new action
+    const newHistory = actionHistory.slice(0, historyIndex + 1);
+    newHistory.push(action);
+    
+    // Keep only MAX_HISTORY actions
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+    }
+    
+    setActionHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    
     setTasks(tasks.filter((task) => task.id !== taskId));
   };
+
+  // Undo function - Issue #9
+  const handleUndo = () => {
+    if (historyIndex < 0) return;
+
+    const action = actionHistory[historyIndex];
+    
+    switch (action.type) {
+      case "delete":
+        // Restore deleted task
+        setTasks((prev) => [...prev, action.task]);
+        break;
+      case "create":
+        // Remove created task
+        setTasks((prev) => prev.filter((t) => t.id !== action.task.id));
+        break;
+      case "update":
+        // Revert to previous state
+        if (action.previousTask) {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === action.previousTask!.id ? action.previousTask! : t))
+          );
+        }
+        break;
+    }
+
+    setHistoryIndex(historyIndex - 1);
+  };
+
+  // Redo function - Issue #9
+  const handleRedo = () => {
+    if (historyIndex >= actionHistory.length - 1) return;
+
+    const nextIndex = historyIndex + 1;
+    const action = actionHistory[nextIndex];
+
+    switch (action.type) {
+      case "delete":
+        setTasks((prev) => prev.filter((t) => t.id !== action.task.id));
+        break;
+      case "create":
+        setTasks((prev) => [...prev, action.task]);
+        break;
+      case "update":
+        setTasks((prev) =>
+          prev.map((t) => (t.id === action.task.id ? action.task : t))
+        );
+        break;
+    }
+
+    setHistoryIndex(nextIndex);
+  };
+
+  // Keyboard shortcuts for undo/redo - Issue #9
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [historyIndex, actionHistory]);
 
   const handleDragStart = (taskId: string) => {
     setDraggedTask(taskId);
@@ -897,6 +1019,33 @@ export default function TaskManager() {
               <PlusIcon />
               <span className="ml-2">New Task</span>
             </Button>
+            
+            {/* Undo/Redo Controls - Issue #9 */}
+            <div className="flex items-center gap-1 border border-[var(--border-default)] rounded-lg overflow-hidden">
+              <button
+                onClick={handleUndo}
+                disabled={historyIndex < 0}
+                className="px-3 py-2 hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Undo (Ctrl+Z)"
+              >
+                <UndoIcon />
+              </button>
+              <div className="w-px h-5 bg-[var(--border-default)]" />
+              <button
+                onClick={handleRedo}
+                disabled={historyIndex >= actionHistory.length - 1}
+                className="px-3 py-2 hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Redo (Ctrl+Y)"
+              >
+                <RedoIcon />
+              </button>
+            </div>
+            
+            {historyIndex >= 0 && (
+              <span className="text-xs text-[var(--text-muted)]">
+                {historyIndex + 1} actions
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -912,21 +1061,6 @@ export default function TaskManager() {
             )}
           </div>
         </div>
-
-        {/* Create Dialog */}
-        <Dialog
-          isOpen={isCreateOpen}
-          onClose={() => setIsCreateOpen(false)}
-          title="Create New Task"
-        >
-          {renderForm()}
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateTask}>Create Task</Button>
-          </div>
-        </Dialog>
 
         {/* Create Dialog */}
         <Dialog
@@ -998,7 +1132,7 @@ export default function TaskManager() {
         <div className="border-t border-[var(--border-default)] mt-8 pt-6">
           <p className="text-center text-sm text-[var(--text-muted)]">
             Drag and drop tasks between columns to update their status. Click
-            the + button to create new tasks.
+            the + button to create new tasks. Use Ctrl+Z to undo deletions.
           </p>
         </div>
       </div>

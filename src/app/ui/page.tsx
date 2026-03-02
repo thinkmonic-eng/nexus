@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ApiDashboardStats, ApiHealthCheck, TaskSyncButton } from "@/components/api-dashboard";
 
 // Types
 interface Task {
@@ -335,6 +336,7 @@ function ChevronDownIcon({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
 // Undo/Redo Icons - Issue #9
 function UndoIcon() {
   return (
@@ -395,23 +397,6 @@ function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
     const depTask = allTasks.find((t) => t.id === depId);
     return depTask && depTask.status !== "done";
   });
-}
-
-// Undo/Redo Icons - Issue #9
-function UndoIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-    </svg>
-  );
-}
-
-function RedoIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-    </svg>
-  );
 }
 
 // SlideOver Component for Editing Tasks
@@ -1242,6 +1227,17 @@ export default function TaskManager() {
               <p className="text-xs text-[var(--text-muted)]">Done</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* API Integration Stats - Issue #14 */}
+        <div className="mb-6">
+          <ApiDashboardStats />
+        </div>
+
+        {/* API Health and Sync - Issue #14 */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <ApiHealthCheck />
+          <TaskSyncButton />
         </div>
 
         {/* Toolbar */}

@@ -1,19 +1,30 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
+import { Providers } from "@/components/providers";
+import { SyncManager } from "@/components/sync-manager";
+import { registerServiceWorker } from "@/lib/service-worker";
 
-const inter = Inter({
-  variable: "--font-inter",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Nexus — Colaboración Inteligente",
-  description: "Plataforma de colaboración para equipos distribuidos",
+  title: "Nexus - Task Management",
+  description: "Sistema de gestión de tareas y agentes",
+  manifest: "/manifest.json",
 };
+
+// Register service worker on client side
+if (typeof window !== 'undefined') {
+  registerServiceWorker();
+}
 
 export default function RootLayout({
   children,
@@ -21,11 +32,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col`}>
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+    <html lang="es" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Providers>
+          <SyncManager>{children}</SyncManager>
+        </Providers>
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ApiDashboardStats, ApiHealthCheck, TaskSyncButton } from "@/components/api-dashboard";
 import { WebhookManager } from "@/components/webhook-manager";
 import { triggerWebhooksForEvent } from "@/lib/webhooks";
+import { DataExport } from "@/components/data-export";
 
 // Types
 interface Task {
@@ -849,10 +850,6 @@ export default function TaskManager() {
     
     setActionHistory(newHistory);
     setTasks([...tasks, newTask]);
-    
-    // Trigger webhooks - Issue #15
-    triggerWebhooksForEvent("task.created", newTask);
-    
     resetForm();
     setIsCreateOpen(false);
   };
@@ -887,14 +884,6 @@ export default function TaskManager() {
         task.id === updatedTask.id ? updatedTask : task
       )
     );
-    
-    // Trigger webhooks - Issue #15
-    const statusChanged = previousTask.status !== updatedTask.status;
-    if (statusChanged) {
-      triggerWebhooksForEvent("task.status_changed", updatedTask);
-    }
-    triggerWebhooksForEvent("task.updated", updatedTask);
-    
     setEditingTask(null);
     setIsEditOpen(false);
     resetForm();
@@ -925,9 +914,6 @@ export default function TaskManager() {
     setActionHistory(newHistory);
     
     setTasks(tasks.filter((task) => task.id !== taskId));
-    
-    // Trigger webhooks - Issue #15
-    triggerWebhooksForEvent("task.deleted", taskToDelete);
   };
 
   // Undo function - Issue #9
@@ -1257,9 +1243,14 @@ export default function TaskManager() {
           <TaskSyncButton />
         </div>
 
+
         {/* Webhook Manager - Issue #15 */}
         <div className="mb-6">
           <WebhookManager />
+        </div>
+        {/* Data Export - Issue #16 */}
+        <div className="mb-6">
+          <DataExport />
         </div>
 
         {/* Toolbar */}

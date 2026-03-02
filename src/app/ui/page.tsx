@@ -5,6 +5,8 @@ import { ApiDashboardStats, ApiHealthCheck, TaskSyncButton } from "@/components/
 import { WebhookManager } from "@/components/webhook-manager";
 import { triggerWebhooksForEvent } from "@/lib/webhooks";
 import { DataExport } from "@/components/data-export";
+import { ThemeSelector } from "@/components/theme-selector";
+import { applyTheme, getThemeConfig } from "@/lib/themes";
 
 // Types
 interface Task {
@@ -800,6 +802,12 @@ export default function TaskManager() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const MAX_HISTORY = 50;
 
+  // Apply theme on mount - Issue #19
+  useEffect(() => {
+    const config = getThemeConfig();
+    applyTheme(config);
+  }, []);
+
   // Form state
   const [formData, setFormData] = useState<Partial<Task>>({
     title: "",
@@ -1251,6 +1259,11 @@ export default function TaskManager() {
         {/* Data Export - Issue #16 */}
         <div className="mb-6">
           <DataExport />
+        </div>
+
+        {/* Theme Selector - Issue #19 */}
+        <div className="mb-6">
+          <ThemeSelector />
         </div>
 
         {/* Toolbar */}

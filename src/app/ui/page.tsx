@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 // Types
 interface Task {
@@ -12,6 +12,19 @@ interface Task {
   tags: string[];
   createdAt: Date;
   dueDate?: Date;
+  assignee?: string;
+  project?: string;
+  contract?: string;
+  execution?: string;
+  dependencies?: string[];
+}
+
+interface Activity {
+  id: string;
+  taskId: string;
+  action: string;
+  timestamp: Date;
+  user: string;
 }
 
 interface Column {
@@ -43,6 +56,8 @@ const INITIAL_TASKS: Task[] = [
     priority: "high",
     tags: ["design", "foundation"],
     createdAt: new Date(),
+    assignee: "John Doe",
+    project: "Nexus",
   },
   {
     id: "task-2",
@@ -52,6 +67,8 @@ const INITIAL_TASKS: Task[] = [
     priority: "high",
     tags: ["feature", "auth"],
     createdAt: new Date(),
+    assignee: "Jane Smith",
+    project: "Nexus",
   },
   {
     id: "task-3",
@@ -61,6 +78,8 @@ const INITIAL_TASKS: Task[] = [
     priority: "medium",
     tags: ["frontend", "marketing"],
     createdAt: new Date(),
+    assignee: "Bob Johnson",
+    project: "Website",
   },
   {
     id: "task-4",
@@ -70,6 +89,7 @@ const INITIAL_TASKS: Task[] = [
     priority: "low",
     tags: ["docs"],
     createdAt: new Date(),
+    project: "Nexus",
   },
 ];
 
@@ -79,20 +99,22 @@ function Button({
   onClick,
   variant = "default",
   className = "",
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   variant?: "default" | "outline" | "ghost";
   className?: string;
+  disabled?: boolean;
 }) {
-  const baseStyles = "px-4 py-2 rounded-lg font-medium transition-all duration-200";
+  const baseStyles = "px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
     default: "bg-[var(--accent-purple)] text-white hover:opacity-90",
     outline: "border border-[var(--border-default)] hover:bg-[var(--bg-secondary)]",
     ghost: "hover:bg-[var(--bg-secondary)]",
   };
   return (
-    <button onClick={onClick} className={`${baseStyles} ${variants[variant]} ${className}`}>
+    <button onClick={onClick} disabled={disabled} className={`${baseStyles} ${variants[variant]} ${className}`}>
       {children}
     </button>
   );
@@ -126,17 +148,19 @@ function Textarea({
   value,
   onChange,
   placeholder,
+  rows = 3,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
+  rows?: number;
 }) {
   return (
     <textarea
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      rows={3}
+      rows={rows}
       className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)] resize-none"
     />
   );
@@ -287,6 +311,304 @@ function TagIcon() {
   );
 }
 
+function XIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg className={`w-4 h-4 transition-transform ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+// SlideOver Component for Editing Tasks
+function SlideOver({
+  isOpen,
+  onClose,
+  task,
+  onSave,
+  onDelete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  task: Task | null;
+  onSave: (task: Task) => void;
+  onDelete: (taskId: string) => void;
+}) {
+  const [formData, setFormData] = useState<Partial<Task>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    details: true,
+    contract: false,
+    execution: false,
+    activity: false,
+  });
+
+  useEffect(() => {
+    if (task) {
+      setFormData({ ...task });
+      setHasChanges(false);
+    }
+  }, [task, isOpen]);
+
+  const handleChange = (field: keyof Task, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    if (task && formData.title) {
+      onSave({ ...task, ...formData } as Task);
+      setHasChanges(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (task) {
+      onDelete(task.id);
+      setShowDeleteConfirm(false);
+      onClose();
+    }
+  };
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  if (!isOpen || !task) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+      
+      {/* Slide-over Panel */}
+      <div className="fixed inset-y-0 right-0 w-[480px] max-w-full bg-[var(--bg-secondary)] border-l border-[var(--border-default)] z-50 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)]">
+          <div className="flex items-center gap-3">
+            <Select
+              value={formData.status || "todo"}
+              onChange={(value) => handleChange("status", value)}
+              options={[
+                { value: "todo", label: "To Do" },
+                { value: "inprogress", label: "In Progress" },
+                { value: "done", label: "Done" },
+              ]}
+            />
+            {hasChanges && (
+              <Badge variant="default" className="animate-pulse">
+                Unsaved
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+            >
+              <TrashIcon />
+            </Button>
+            <Button variant="ghost" onClick={onClose}>
+              <XIcon />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Title</label>
+            <Input
+              value={formData.title || ""}
+              onChange={(e) => handleChange("title", e.target.value)}
+              placeholder="Task title"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Description</label>
+            <Textarea
+              value={formData.description || ""}
+              onChange={(e) => handleChange("description", e.target.value)}
+              placeholder="Task description"
+              rows={4}
+            />
+          </div>
+
+          {/* Main Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Priority</label>
+              <Select
+                value={formData.priority || "medium"}
+                onChange={(value) => handleChange("priority", value)}
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Assignee</label>
+              <Input
+                value={formData.assignee || ""}
+                onChange={(e) => handleChange("assignee", e.target.value)}
+                placeholder="Assignee name"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Due Date</label>
+              <Input
+                type="date"
+                value={formData.dueDate ? new Date(formData.dueDate).toISOString().split('T')[0] : ""}
+                onChange={(e) => handleChange("dueDate", e.target.value ? new Date(e.target.value) : undefined)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Project</label>
+              <Input
+                value={formData.project || ""}
+                onChange={(e) => handleChange("project", e.target.value)}
+                placeholder="Project name"
+              />
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Tags</label>
+            <Input
+              value={formData.tags?.join(", ") || ""}
+              onChange={(e) =>
+                handleChange(
+                  "tags",
+                  e.target.value.split(",").map((t) => t.trim()).filter(Boolean)
+                )
+              }
+              placeholder="design, urgent, review"
+            />
+          </div>
+
+          {/* Collapsible Sections */}
+          <div className="space-y-2">
+            {/* Task Contract */}
+            <div className="border border-[var(--border-default)] rounded-lg">
+              <button
+                onClick={() => toggleSection("contract")}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-primary)]/50 transition-colors"
+              >
+                <span className="font-medium">Task Contract</span>
+                <ChevronDownIcon className={expandedSections.contract ? "rotate-180" : ""} />
+              </button>
+              {expandedSections.contract && (
+                <div className="px-4 pb-4">
+                  <Textarea
+                    value={formData.contract || ""}
+                    onChange={(e) => handleChange("contract", e.target.value)}
+                    placeholder="Define the contract/acceptance criteria for this task..."
+                    rows={4}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Execution */}
+            <div className="border border-[var(--border-default)] rounded-lg">
+              <button
+                onClick={() => toggleSection("execution")}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-primary)]/50 transition-colors"
+              >
+                <span className="font-medium">Execution Notes</span>
+                <ChevronDownIcon className={expandedSections.execution ? "rotate-180" : ""} />
+              </button>
+              {expandedSections.execution && (
+                <div className="px-4 pb-4">
+                  <Textarea
+                    value={formData.execution || ""}
+                    onChange={(e) => handleChange("execution", e.target.value)}
+                    placeholder="Notes about execution, implementation details..."
+                    rows={4}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Activity */}
+            <div className="border border-[var(--border-default)] rounded-lg">
+              <button
+                onClick={() => toggleSection("activity")}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--bg-primary)]/50 transition-colors"
+              >
+                <span className="font-medium">Activity Log</span>
+                <ChevronDownIcon className={expandedSections.activity ? "rotate-180" : ""} />
+              </button>
+              {expandedSections.activity && (
+                <div className="px-4 pb-4 space-y-2">
+                  <div className="text-sm text-[var(--text-muted)]">
+                    <p>• Task created on {task.createdAt.toLocaleDateString()}</p>
+                    <p>• Last updated: {new Date().toLocaleDateString()}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-[var(--border-default)] px-6 py-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!hasChanges}>
+            {hasChanges ? "Save Changes" : "Saved"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Delete Task?</h3>
+            <p className="text-[var(--text-muted)] mb-4">
+              Are you sure you want to delete &quot;{task.title}&quot;? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDelete}
+                className="bg-red-500 hover:bg-red-600 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function TaskManager() {
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -330,21 +652,10 @@ export default function TaskManager() {
     setIsCreateOpen(false);
   };
 
-  const handleUpdateTask = () => {
-    if (!editingTask || !formData.title) return;
-
+  const handleUpdateTask = (updatedTask: Task) => {
     setTasks(
       tasks.map((task) =>
-        task.id === editingTask.id
-          ? {
-              ...task,
-              title: formData.title || task.title,
-              description: formData.description || task.description,
-              status: (formData.status as Task["status"]) || task.status,
-              priority: (formData.priority as Task["priority"]) || task.priority,
-              tags: formData.tags || task.tags,
-            }
-          : task
+        task.id === updatedTask.id ? updatedTask : task
       )
     );
     setEditingTask(null);
@@ -617,20 +928,29 @@ export default function TaskManager() {
           </div>
         </Dialog>
 
-        {/* Edit Dialog */}
+        {/* Create Dialog */}
         <Dialog
-          isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
-          title="Edit Task"
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          title="Create New Task"
         >
           {renderForm()}
           <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateTask}>Update Task</Button>
+            <Button onClick={handleCreateTask}>Create Task</Button>
           </div>
         </Dialog>
+
+        {/* Edit SlideOver - Issue #8 */}
+        <SlideOver
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          task={editingTask}
+          onSave={handleUpdateTask}
+          onDelete={handleDeleteTask}
+        />
 
         {/* Kanban Board */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

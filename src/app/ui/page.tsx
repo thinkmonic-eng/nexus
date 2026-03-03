@@ -790,7 +790,33 @@ function SlideOver({
 }
 
 export default function TaskManager() {
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  // Load tasks from localStorage on mount - Issue #23 Fix
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nexus-tasks");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Convert date strings back to Date objects
+          return parsed.map((t: Task) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
+          }));
+        } catch {
+          return INITIAL_TASKS;
+        }
+      }
+    }
+    return INITIAL_TASKS;
+  });
+
+  // Save tasks to localStorage whenever they change - Issue #23 Fix
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexus-tasks", JSON.stringify(tasks));
+    }
+  }, [tasks]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
